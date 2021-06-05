@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <string>
+#include <chrono>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -11,8 +12,11 @@ typedef unsigned char byte;
 
 #include <unistd.h>
 #include <backend/decoder.cpp>
+#include <backend/plane.cpp>
 
 #define BUFFER_SIZE 128
+
+using namespace std::chrono;
 
 class Socket {
 	private:
@@ -62,12 +66,12 @@ class Socket {
 		    std::cerr << "socket init done\n";
 		}
 
-		void loop() {
+		void loop(std::mutex &access, std::unordered_map<std::vector<byte>, plane, container_hash<std::vector<unsigned byte>> > &store) {
 			bool ok = false;
 			std::vector<byte> img;
 			do {
 				sockaddr_storage client_addr;
-    			socklen_t client_addr_size = sizeof(client_addr);
+    		socklen_t client_addr_size = sizeof(client_addr);
 				int conn = accept(sock, (sockaddr *) &client_addr, &client_addr_size);
 
 				if(conn == -1){
@@ -78,10 +82,55 @@ class Socket {
 				std::vector<byte> buf(BUFFER_SIZE);
 				int bytes = recv(conn, buf.data(), BUFFER_SIZE, 0);
 
-				for(int i = BUFFER_SIZE - 1; i >= 0 && buf.back() == 0; i--)
-					buf.pop_back();
+				buf.resize(14);
 
-				std::cerr << (*Decoder::squawk(buf)) << '\n';
+				bool surv = true;
+
+				for(int i = 13; i >= 7; i--)
+					if(buf[i] != 0)
+						surv = false;
+
+				if(surv)
+					buf.resize(7);
+
+				if(!Decoder::icao(buf))
+					continue;
+
+				auto plane = store[*Decoder::icao(buf)];
+
+				access.lock();
+				store.erase(*Decoder::icao(buf));
+				access.unlock();
+
+				if(Decoder::altitude(buf))
+					plane.altitude = Decoder::altitude(buf);
+
+				if(Decoder::identification(buf))
+					plane.ident = Decoder::identification(buf);
+
+				if(Decoder::callsign(buf))
+					plane.callsign = Decoder::callsign(buf);
+
+				if(Decoder::displacement(buf))
+					plane.velocity = Decoder::displacement(buf);
+
+				if(Decoder::squawk(buf))
+					plane.squawk = Decoder::squawk(buf);
+
+				if(Decoder::parity(buf) && (*Decoder::parity(buf))){
+					plane.last_even = make_pair(buf, duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
+				} else if(Decoder::parity(buf) && !(*Decoder::parity(buf))) {
+					plane.last_odd = make_pair(buf, duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
+				}
+
+				if(plane.last_odd && plane.last_even)
+					plane.position = Decoder::position((*plane.last_odd).first, (*plane.last_even).first, (*plane.last_odd).second,  (*plane.last_even).second);
+
+
+					access.lock();
+					store[*Decoder::icao(buf)] = plane;
+					access.unlock();
+
 			} while(true);
 		}
 };

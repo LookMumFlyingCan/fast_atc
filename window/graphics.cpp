@@ -17,6 +17,9 @@ class radarWindow {
     std::vector<sf::Vertex> bounding_box;
     std::vector<sf::Text> labels;
 
+    std::mutex &access;
+    std::unordered_map<std::vector<byte>, plane, container_hash<std::vector<unsigned byte>> > &store;
+
     void drawBg(){
       window.clear(params.bg);
     }
@@ -61,8 +64,8 @@ class radarWindow {
         fillBuffers();
       }
     }
-    
-    void produceBoundingBox(size_t width, size_t box_lenght, size_t box_offset) { 
+
+    void produceBoundingBox(size_t width, size_t box_lenght, size_t box_offset) {
       for(int i = 1; i*box_lenght < (this->window.getSize().x - 2*box_offset); i++){
         if(!(i & 1))
           continue;
@@ -70,15 +73,15 @@ class radarWindow {
         addTriangle((i-1)*box_lenght + box_offset, box_offset);
         addTriangle((i-1)*box_lenght + box_offset, box_offset+width);
         addTriangle(i*box_lenght + box_offset, box_offset+width);
-        
+
         addTriangle(i*box_lenght + box_offset, box_offset);
         addTriangle((i-1)*box_lenght + box_offset, box_offset);
         addTriangle(i*box_lenght + box_offset, box_offset+width);
-        
+
         addTriangle((i-1)*box_lenght + box_offset, window.getSize().y - box_offset);
         addTriangle((i-1)*box_lenght + box_offset, window.getSize().y - box_offset - width);
         addTriangle(i*box_lenght + box_offset, window.getSize().y - box_offset - width);
-        
+
         addTriangle(i*box_lenght + box_offset, window.getSize().y - box_offset);
         addTriangle((i-1)*box_lenght + box_offset, window.getSize().y - box_offset);
         addTriangle(i*box_lenght + box_offset, window.getSize().y - box_offset - width);
@@ -91,15 +94,15 @@ class radarWindow {
         addTriangle(box_offset, (i-1)*box_lenght + box_offset);
         addTriangle(box_offset+width, (i-1)*box_lenght + box_offset);
         addTriangle(box_offset+width, i*box_lenght + box_offset);
-        
+
         addTriangle(box_offset, i*box_lenght + box_offset);
         addTriangle(box_offset, (i-1)*box_lenght + box_offset);
         addTriangle(box_offset+width, i*box_lenght + box_offset);
-        
+
         addTriangle(window.getSize().x - box_offset, (i-1)*box_lenght + box_offset);
         addTriangle(window.getSize().x - box_offset - width, (i-1)*box_lenght + box_offset);
         addTriangle(window.getSize().x - box_offset - width, i*box_lenght + box_offset);
-        
+
         addTriangle(window.getSize().x - box_offset, i*box_lenght + box_offset);
         addTriangle(window.getSize().x - box_offset, (i-1)*box_lenght + box_offset);
         addTriangle(window.getSize().x - box_offset - width, i*box_lenght + box_offset);
@@ -111,8 +114,8 @@ class radarWindow {
         int diff = i - params.vstart, vlen = (window.getSize().x - 2*box_offset - 2*params.shift_factor*params.scale_width)/(params.vend - params.vstart);
 
         addTriangle(box_offset + params.shift_factor*params.scale_width + diff*vlen - params.scale_width, 0, params.muted);
-        addTriangle(box_offset + params.shift_factor*params.scale_width + diff*vlen + params.scale_width, 0, params.muted);         
-        addTriangle(box_offset + params.shift_factor*params.scale_width + diff*vlen - params.scale_width, box_offset + 5, params.muted); 
+        addTriangle(box_offset + params.shift_factor*params.scale_width + diff*vlen + params.scale_width, 0, params.muted);
+        addTriangle(box_offset + params.shift_factor*params.scale_width + diff*vlen - params.scale_width, box_offset + 5, params.muted);
 
         addTriangle(box_offset + params.shift_factor*params.scale_width + diff*vlen - params.scale_width, box_offset + 5, params.muted);
         addTriangle(box_offset + params.shift_factor*params.scale_width + diff*vlen + params.scale_width, 0, params.muted);
@@ -128,13 +131,13 @@ class radarWindow {
 
         labels.push_back(res);
       }
-      
+
       for(int i = params.hstart; i <= params.hend; i++){
         int diff = params.hend - i, hlen = (window.getSize().y - 2*box_offset - 2*params.shift_factor*params.scale_width)/(params.hend - params.hstart);
 
         addTriangle(0, box_offset + params.shift_factor*params.scale_width + diff*hlen - params.scale_width, params.muted);
-        addTriangle(0, box_offset + params.shift_factor*params.scale_width + diff*hlen + params.scale_width, params.muted);         
-        addTriangle(box_offset + 5, box_offset + params.shift_factor*params.scale_width + diff*hlen - params.scale_width, params.muted); 
+        addTriangle(0, box_offset + params.shift_factor*params.scale_width + diff*hlen + params.scale_width, params.muted);
+        addTriangle(box_offset + 5, box_offset + params.shift_factor*params.scale_width + diff*hlen - params.scale_width, params.muted);
 
         addTriangle(box_offset + 5, box_offset + params.shift_factor*params.scale_width + diff*hlen - params.scale_width, params.muted);
         addTriangle(0, box_offset + params.shift_factor*params.scale_width + diff*hlen + params.scale_width, params.muted);
@@ -152,16 +155,16 @@ class radarWindow {
       }
     }
 
-    std::pair<int,int> translateCoords(double v, double h) {
+    std::pair<int,int> translateCoords(long double v, long double h) {
       return std::make_pair(
-            params.bar_offset + params.shift_factor*params.scale_width + (v - params.vstart)/(params.vend - params.vstart) * (window.getSize().x - 2*params.bar_offset - 2*params.shift_factor*params.scale_width),
-            - params.bar_offset - params.shift_factor*params.scale_width + window.getSize().y - ((h - params.hstart)/(params.hend - params.hstart) * (window.getSize().y - 2*params.bar_offset - 2*params.shift_factor*params.scale_width))
+            params.bar_offset + params.shift_factor*params.scale_width + (v - params.vstart)/(abs(params.vend - params.vstart)) * (window.getSize().x - 2*params.bar_offset - 2*params.shift_factor*params.scale_width),
+            params.bar_offset + params.shift_factor*params.scale_width + (((h - params.hstart)/(abs(params.hend - params.hstart)) * (window.getSize().y - 2*params.bar_offset - 2*params.shift_factor*params.scale_width)))
           );
     }
 
   public:
 
-    radarWindow(windowParams g) : window(sf::VideoMode(g.wid, g.hei), g.title, sf::Style::Default, g.s), params(g) {
+    radarWindow(windowParams g, std::mutex &access, std::unordered_map<std::vector<unsigned char>, plane, container_hash<std::vector<unsigned char>> > &store) : window(sf::VideoMode(g.wid, g.hei), g.title, sf::Style::Default, g.s), params(g), access(access), store(store) {
       setTransparency(window.getSystemHandle(), g.alpha);
 
       if(!ft.loadFromFile("assets/font.ttf"))
@@ -194,9 +197,30 @@ class radarWindow {
         for(auto &t : this->labels)
           window.draw(t);
 
-        sf::CircleShape c;
+        access.lock();
+        for(auto &plane : store){
+          if(plane.second.position){
+            sf::CircleShape circ;
 
-        std::cerr << translateCoords(19.1, 49.1).second << " height: " << (window.getSize().y - 2*params.bar_offset - 2*params.shift_factor*params.scale_width) << '\n';
+            auto coords = translateCoords((*plane.second.position).lon, (*plane.second.position).lat);
+
+            std::cerr << coords.first << ' ' << coords.second << '\n';
+            circ.setPosition(coords.first, coords.second);
+            circ.setFillColor(sf::Color::Red);
+            circ.setRadius(4);
+
+            window.draw(circ);
+            if(plane.second.velocity){
+              sf::RectangleShape rect(sf::Vector2f(10, 2));
+              std::cerr <<(*plane.second.velocity).heading << '\n';
+              rect.rotate((*plane.second.velocity).heading);
+              rect.setPosition(coords.first+8, coords.second+4);
+
+              window.draw(rect);
+            }
+          }
+        }
+        access.unlock();
 
         window.display();
       }

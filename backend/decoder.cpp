@@ -33,10 +33,26 @@ struct movement {
 
 class Decoder {
 	private:
+		static long long NL(long double lat){
+			if(lat <= 1e-05 && lat >= -1e-5)
+				return 0;
+			if(abs(lat) <= 87 + 1e-05 && abs(lat) >= 87 - 1e-5)
+				return 2;
+			if(lat > 87 || lat < -87)
+				return 1;
+
+			return std::floor(
+					2*M_PIl
+						/						std::acos(
+							1 - ((1 - std::cos(M_PIl/(2*nz)))/(std::pow(std::cos((M_PIl/180) * std::fabs(lat)), 2)))
+						)
+				);
+		}
+
 		static int cyclicCheck(std::vector<byte> &data, bool leave = false){
 			std::vector<bool> crc;
 
-			for(int i = 0; i < 14; i++)
+			for(int i = 0; i < data.size(); i++)
 				for(int j = 0; j < 8; j++)
 					crc.push_back(data[i] & (1 << (7 - j)));
 
@@ -54,22 +70,6 @@ class Decoder {
 				res += crc[crc.size() - 24 + i] * (1 << (23 - i));
 
 			return res;
-		}
-
-		static long long NL(long double lat){
-			if(lat <= 1e-05 && lat >= -1e-5)
-				return 0;
-			if(abs(lat) <= 87 + 1e-05 && abs(lat) >= 87 - 1e-5)
-				return 2;
-			if(lat > 87 || lat < -87)
-				return 1;
-
-			return std::floor(
-					2*M_PIl
-						/						std::acos(
-							1 - ((1 - std::cos(M_PIl/(2*nz)))/(std::pow(std::cos((M_PIl/180) * std::fabs(lat)), 2)))
-						)
-				);
 		}
 
 	public:
@@ -94,7 +94,7 @@ class Decoder {
 			auto df = Decoder::downlinkFormat(data);
 
 			if(df == 0 || df == 4 || df == 5 || df == 16 || df == 20 || df == 21) {
-				auto remainder = cyclicCheck(data);
+				auto remainder = cyclicCheck(data, true);
 				auto tail = data[data.size() - 1] + data[data.size() - 2]*(1 << 8) + data[data.size() - 3]*(1 << 16);
 
 				std::vector<byte> res;
@@ -111,10 +111,9 @@ class Decoder {
 		}
 
 		static std::optional<std::pair<byte, byte>> identification(std::vector<byte> &data){
-			auto df = Decoder::downlinkFormat(data);
 			auto tc = Decoder::typecode(data);
 
-			return  ((df == 17 || df == 18) && tc >= 1 && tc <= 4) ?
+			return  (tc && *tc >= 1 && *tc <= 4) ?
 				std::optional<std::pair<byte, byte>>(std::make_pair(data[4] >> 3, data[4] % (1 << 4))) : std::optional<std::pair<byte, byte>>(std::nullopt);
 		}
 
@@ -122,7 +121,7 @@ class Decoder {
 			auto df = Decoder::downlinkFormat(data);
 			auto tc = Decoder::typecode(data);
 
-			if(!(df == 17 && ((tc >= 9 && tc <= 18) || (tc >= 20 && tc <= 22))))
+			if(!(df == 17 && ((*tc >= 9 && *tc <= 18) || (*tc >= 20 && *tc <= 22))))
 				return std::nullopt;
 
 			return data[7] & (1 << 2);
@@ -132,7 +131,7 @@ class Decoder {
 			auto df = Decoder::downlinkFormat(data);
 			auto tc = Decoder::typecode(data);
 
-			if(!(df == 17 && tc >= 1 && tc <= 4))
+			if(!(df == 17 && *tc >= 1 && *tc <= 4))
 				return std::nullopt;
 
 			std::string res = "";
@@ -179,15 +178,15 @@ class Decoder {
 
 			long double lat = 0, lon = 0;
 
-			if(timeF < timeS){
+			if(timeF > timeS){
 				lat = even_lat;
 				auto nl = NL(lat);
-				lon = (360 / std::max(nl, 1LL)) * (
+				lon = (360.0L / std::max(nl, 1LL)) * (
 					(std::fmod(std::floor((even_lon * (nl - 1)) - (odd_lon * nl) + .5), std::max(nl, 1LL))) + even_lon);
 			} else {
 				lat = odd_lat;
 				auto nl = NL(lat);
-				lon = (360 / std::max(nl - 1, 1LL)) * (
+				lon = (360.0L / std::max(nl - 1, 1LL)) * (
 					(std::fmod(std::floor((even_lon * (nl - 1)) - (odd_lon * nl) + .5), std::max(nl - 1, 1LL))) + odd_lon);
 			}
 
@@ -198,10 +197,10 @@ class Decoder {
 			auto df = Decoder::downlinkFormat(data);
 			auto tc = Decoder::typecode(data);
 
-			if(!(df == 17 && ((tc >= 9 && tc <= 18) || (tc >= 20 && tc <= 22))))
+			if(!(df == 17 && ((*tc >= 9 && *tc <= 18) || (*tc >= 20 && *tc <= 22))))
 				return std::nullopt;
 
-			if(tc >= 9 && tc <= 18)
+			if(*tc >= 9 && *tc <= 18)
 				return distance{
 					.length = (((data[5] & 1) ? 25 : 100) * (((data[5] >> 1) * (1 << 4)) + (data[6] >> 4))) - 1000,
 					.gnss = false
@@ -217,7 +216,7 @@ class Decoder {
 			auto df = Decoder::downlinkFormat(data);
 			auto tc = Decoder::typecode(data);
 
-			if(!(df == 17 && tc == 19))
+			if(!(df == 17 && *tc == 19))
 				return std::nullopt;
 
 			int subtype = data[4] % 8;
@@ -233,12 +232,12 @@ class Decoder {
 				angle = std::fmod(((std::atan2(ewvelocity, nsvelocity) * 360.0L/(2*M_PIl)) + 360*10), 360);
 			} else {
 				info = (data[7] >> 7) ? airspeed_tas : airspeed_ias;
-				angle = (( ((data[5] % 4) * (1 << 8)) + data[6] - 1)) * 360.0L/1024.0L;
+				angle = (( ((data[5] % 4) * (1 << 8)) + data[6])) * 360.0L/1024.0L;
 				velocity = (subtype == 3 ? 1 : 4) * ( ((data[7] % 128) * (1 << 3)) + (data[8] >> 5) - 1);
 			}
 
 			return movement{
-				.vertical_rate = ((((data[8] % 8) >> 2) ? 1 : -1) * (64 * ((((data[8] % 4) * (1 << 7)) + (data[9] >> 1)) - 1))) == 0 ? 64 : ((((data[8] % 8) >> 2) ? 1 : -1) * (64 * ((((data[8] % 4) * (1 << 7)) + (data[9] >> 1)) - 1))),
+				.vertical_rate = ((((data[8] % 16) >> 3) ? -1 : 1) * (64 * ((((data[8] % 8) * (1 << 6)) + (data[9] >> 2)) - 1))),
 				.diff = ((data[10] >> 7) ? 1 : -1) * (data[10] % 128),
 				.velocity = velocity,
 				.heading = angle,
