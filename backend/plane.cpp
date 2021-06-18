@@ -1,4 +1,5 @@
 struct plane {
+  bool selected;
   std::optional<std::pair<byte, byte>> ident;
   std::optional<coordinates> position;
   std::optional<distance> altitude;

@@ -7,11 +7,9 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-
-typedef unsigned char byte;
-
 #include <unistd.h>
 #include <backend/decoder.cpp>
+
 #include <backend/plane.cpp>
 
 #define BUFFER_SIZE 128
@@ -66,7 +64,7 @@ class Socket {
 		    std::cerr << "socket init done\n";
 		}
 
-		void loop(std::mutex &access, std::unordered_map<std::vector<byte>, plane, container_hash<std::vector<unsigned byte>> > &store) {
+		void loop(std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store) {
 			bool ok = false;
 			std::vector<byte> img;
 			do {
@@ -96,11 +94,19 @@ class Socket {
 				if(!Decoder::icao(buf))
 					continue;
 
-				auto plane = store[*Decoder::icao(buf)];
+				surv = false;
 
 				access.lock();
+				if(store.size() == 0)
+					surv = true;
+
+				auto plane = store[*Decoder::icao(buf)];
+
 				store.erase(*Decoder::icao(buf));
 				access.unlock();
+
+				//if(surv)
+				//	plane.selected = true;
 
 				if(Decoder::altitude(buf))
 					plane.altitude = Decoder::altitude(buf);

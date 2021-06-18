@@ -3,25 +3,31 @@
 #include <SFML/Graphics.hpp>
 #include <cmath>
 #include <string>
+#include <sstream>
 
 #include <window/hardware.cpp>
 #include <window/params.cpp>
 
+constexpr int l_size = 8;
+
 class radarWindow {
   private:
     sf::RenderWindow window;
+    sf::RenderWindow planeWindow;
     windowParams params;
     sf::Event event;
     sf::Font ft;
 
     std::vector<sf::Vertex> bounding_box;
     std::vector<sf::Text> labels;
+    std::vector<sf::Text> guides;
 
     std::mutex &access;
-    std::unordered_map<std::vector<byte>, plane, container_hash<std::vector<unsigned byte>> > &store;
+    std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store;
 
     void drawBg(){
       window.clear(params.bg);
+      planeWindow.clear(params.bg);
     }
 
     void handleKeypres(sf::Keyboard::Key key){
@@ -29,28 +35,118 @@ class radarWindow {
         case sf::Keyboard::Key::Q:
           window.close();
           break;
-        case sf::Keyboard::Key::Up:
+        case sf::Keyboard::Key::W:
           params.hstart++;
           params.hend++;
           break;
-        case sf::Keyboard::Key::Down:
+        case sf::Keyboard::Key::S:
           params.hstart--;
           params.hend--;
           break;
-        case sf::Keyboard::Key::Left:
+        case sf::Keyboard::Key::A:
           params.vstart--;
           params.vend--;
           break;
-        case sf::Keyboard::Key::Right:
+        case sf::Keyboard::Key::D:
           params.vstart++;
           params.vend++;
           break;
+        case sf::Keyboard::Key::Add:
+          params.vend++;
+          break;
+        case sf::Keyboard::Key::Subtract:
+            if(params.vend == params.vstart + 1)
+              break;
+
+            params.vend--;
+            break;
+            case sf::Keyboard::Key::Multiply:
+              params.hend++;
+              break;
+            case sf::Keyboard::Key::Divide:
+                if(params.hend == params.hstart + 1)
+                  break;
+
+                params.hend--;
+                break;
+        case sf::Keyboard::Key::Down: {
+            access.lock();
+
+            if(store.size() == 0){
+              access.unlock();
+              break;
+            }
+
+            bool swck = false;
+            bool fnd = true;
+            for(auto i = store.begin(); i != store.end(); i++){
+              if(swck){
+                i->second.selected = true;
+                swck = false;
+                break;
+              }
+
+
+              if(i->second.selected) {
+                i->second.selected = false;
+                swck = true;
+                fnd = false;
+              }
+            }
+
+            if(swck)
+              store.begin()->second.selected = true;
+
+            if(fnd)
+              store.begin()->second.selected = true;
+
+            access.unlock();
+
+            break;
+          }
+        case sf::Keyboard::Key::Up: {
+              access.lock();
+
+              if(store.size() == 0){
+                access.unlock();
+                break;
+              }
+
+              bool swck = false;
+              bool fnd = true;
+              auto i = store.end();
+              do {
+                i--;
+                if(swck){
+                  i->second.selected = true;
+                  swck = false;
+                  break;
+                }
+
+
+                if(i->second.selected) {
+                  i->second.selected = false;
+                  swck = true;
+                  fnd = false;
+                }
+              } while (i != store.begin());
+
+              if(swck)
+                (--store.end())->second.selected = true;
+
+              if(fnd)
+                (--store.end())->second.selected = true;
+
+              access.unlock();
+
+              break;
+            }
       }
 
       fillBuffers();
     }
 
-    void handleEvent(){
+    void handleEvent(sf::RenderWindow &wind){
       if(event.type == sf::Event::Closed)
         window.close();
 
@@ -59,7 +155,7 @@ class radarWindow {
 
       if(event.type == sf::Event::Resized) {
         sf::FloatRect visibleArea(0, 0, event.size.width, event.size.height);
-        window.setView(sf::View(visibleArea));
+        wind.setView(sf::View(visibleArea));
 
         fillBuffers();
       }
@@ -155,17 +251,39 @@ class radarWindow {
       }
     }
 
+    sf::Text create_label(std::string txt, sf::Color color, int x, int y){
+      sf::Text ret;
+      ret.setFont(ft);
+      ret.setString(txt);
+      ret.setPosition(x,y);
+      ret.setFillColor(color);
+      ret.setCharacterSize(params.label_size);
+
+      return ret;
+    }
+
     std::pair<int,int> translateCoords(long double v, long double h) {
+      //std::cerr << params.bar_offset + params.shift_factor*params.scale_width << " + "  << (long double)(v - params.vstart) << " / " << std::fabs(params.vend - params.vstart) << " * " << (window.getSize().x - 2*params.bar_offset - 2*params.shift_factor*params.scale_width) << '\n';
       return std::make_pair(
-            params.bar_offset + params.shift_factor*params.scale_width + (v - params.vstart)/(abs(params.vend - params.vstart)) * (window.getSize().x - 2*params.bar_offset - 2*params.shift_factor*params.scale_width),
-            params.bar_offset + params.shift_factor*params.scale_width + (((h - params.hstart)/(abs(params.hend - params.hstart)) * (window.getSize().y - 2*params.bar_offset - 2*params.shift_factor*params.scale_width)))
+            params.bar_offset + params.shift_factor*params.scale_width + ((((long double)(v - params.vstart))/(std::fabs(params.vend - params.vstart))) * (window.getSize().x - 2*params.bar_offset - 2*params.shift_factor*params.scale_width)),
+            params.bar_offset + params.shift_factor*params.scale_width +
+
+            ((((long double)(h - params.hstart))/std::fabs(params.hend - params.hstart))
+
+            * (window.getSize().y - 2*params.bar_offset - 2*params.shift_factor*params.scale_width))
           );
+    }
+
+    void addLabel(std::string text, sf::Color c, int x, int y) {
+      this->guides.push_back(create_label(text, c, x, y));
     }
 
   public:
 
-    radarWindow(windowParams g, std::mutex &access, std::unordered_map<std::vector<unsigned char>, plane, container_hash<std::vector<unsigned char>> > &store) : window(sf::VideoMode(g.wid, g.hei), g.title, sf::Style::Default, g.s), params(g), access(access), store(store) {
+    radarWindow(windowParams g, windowParams pln, std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store) : window(sf::VideoMode(g.wid, g.hei), g.title, sf::Style::Default, g.s), planeWindow(sf::VideoMode(pln.wid, pln.hei), pln.title, sf::Style::Default, pln.s), params(g), access(access), store(store) {
       setTransparency(window.getSystemHandle(), g.alpha);
+      window.setFramerateLimit(g.frames);
+      planeWindow.setFramerateLimit(pln.frames);
 
       if(!ft.loadFromFile("assets/font.ttf"))
           std::cerr << "shieeet\n";
@@ -186,10 +304,16 @@ class radarWindow {
     }
 
     void loop() {
-      while(window.isOpen()){
-        while(window.pollEvent(event)){
-          handleEvent();
+      while(window.isOpen() && planeWindow.isOpen()){
+
+        while(planeWindow.pollEvent(event)){
+          handleEvent(planeWindow);
         }
+
+        while(window.pollEvent(event)){
+          handleEvent(window);
+        }
+
 
         drawBg();
         window.draw(&bounding_box[0], bounding_box.size(), sf::Triangles);
@@ -197,36 +321,80 @@ class radarWindow {
         for(auto &t : this->labels)
           window.draw(t);
 
+        this->guides.clear();
+
+        size_t row = params.bar_offset;
+
+        addLabel("ICAO", params.secondary, params.bar_offset, row);
+        addLabel("CALL", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 1, row);
+        addLabel("IDENT", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 2, row);
+        addLabel("ALTI", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 3, row);
+        addLabel("SPD", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 4, row);
+        addLabel("AZIM", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 5, row);
+        addLabel("V/R", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 6, row);
+        addLabel("VSRC", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 7, row);
+
+        row += guides[0].getCharacterSize();
+
         access.lock();
         for(auto &plane : store){
           if(plane.second.position){
-            sf::CircleShape circ;
-
+            //std::cerr << "lon: " << (*plane.second.position).lon << " lat: " << (*plane.second.position).lat << '\n';
             auto coords = translateCoords((*plane.second.position).lon, (*plane.second.position).lat);
 
-            std::cerr << coords.first << ' ' << coords.second << '\n';
-            circ.setPosition(coords.first, coords.second);
-            circ.setFillColor(sf::Color::Red);
-            circ.setRadius(4);
-
-            window.draw(circ);
             if(plane.second.velocity){
-              sf::RectangleShape rect(sf::Vector2f(10, 2));
-              std::cerr <<(*plane.second.velocity).heading << '\n';
-              rect.rotate((*plane.second.velocity).heading);
-              rect.setPosition(coords.first+8, coords.second+4);
+              sf::RectangleShape rect(sf::Vector2f(15, 2));
+              rect.setOrigin(1.f, -0.5f);
+              rect.rotate(-90.f + (*plane.second.velocity).heading);
+              rect.setPosition(coords.first, coords.second);
 
               window.draw(rect);
             }
+
+            sf::CircleShape circ;
+
+            //std::cerr << coords.first << ' ' << coords.second << '\n';
+            circ.setOrigin(2.f, 2.f);
+            circ.setPosition(coords.first, coords.second);
+            circ.setFillColor(plane.second.selected ? sf::Color::Red : sf::Color::Blue);
+            circ.setRadius(4.f);
+
+            window.draw(circ);
           }
+
+          std::stringstream icc;
+          icc << std::hex << (int)plane.first[0] << (int)plane.first[1] << (int)plane.first[2];
+
+          auto data = plane.second;
+
+          addLabel(icc.str(), data.selected ? params.selection : params.muted, params.bar_offset, row);
+          addLabel(data.callsign ? *data.callsign : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 1, row);
+          addLabel(data.ident ? (std::to_string((*data.ident).first) + " " + std::to_string((*data.ident).second)) : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 2, row);
+          addLabel(data.altitude ? (std::to_string((*data.altitude).length) + "m") : "INOP", data.altitude ? ((*data.altitude).gnss ? params.tert : params.quadr) : params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 3, row);
+          icc = std::stringstream();
+          icc << std::fixed << std::setprecision(2) << (data.velocity ? (*data.velocity).velocity : 0);
+          addLabel(data.velocity ? (icc.str() + "kt") : "INOP", data.velocity ? ((*data.velocity).gnss ? params.tert : params.quadr) : params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 4, row);
+          icc = std::stringstream();
+          icc << std::fixed << std::setprecision(2) << (data.velocity ? (*data.velocity).heading : 0);
+          addLabel(data.velocity ? icc.str() : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 5, row);
+          addLabel(data.velocity ? (std::to_string((*data.velocity).vertical_rate) + "ft/min") : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 6, row);
+          addLabel(data.velocity ? ((*data.velocity).info == inertial ? "INERT" : ((*data.velocity).info == airspeed_ias ? "IAS" : "TAS")) : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 7, row);
+
+          row += guides[0].getCharacterSize();
         }
         access.unlock();
 
+        for(auto &t : this->guides)
+          planeWindow.draw(t);
+
+
         window.display();
+        planeWindow.display();
       }
     }
 
     ~radarWindow() {
+      this->planeWindow.close();
       this->window.close();
     }
 };

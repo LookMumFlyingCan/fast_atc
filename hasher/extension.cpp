@@ -1,3 +1,5 @@
+#include <algorithm>
+
 template <typename Container>
 struct container_hash {
     std::size_t operator()(const Container &c) const {
@@ -7,5 +9,19 @@ struct container_hash {
       }
 
       return hash;
+    }
+};
+
+template <typename Container>
+struct container_comp {
+    bool operator()(const Container &a, const Container &b) const {
+      for(int i = 0; i < std::min(a.size(), b.size()); i++){
+        if(a[i] == b[i])
+          continue;
+
+        return a[i] < b[i];
+      }
+
+      return false;
     }
 };

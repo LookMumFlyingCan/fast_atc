@@ -3,33 +3,14 @@
 #include <cmath>
 #include <algorithm>
 
+#include <backend/properties.cpp>
+
 #define BUFFER_SIZE 128
 
 const byte generator[4] = {0b11111111, 0b11111010, 0b00000100, 0b10000000};
 const std::string lookup = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ##### ###############0123456789######";
 
 const int nz = 15;
-
-struct coordinates {
-	long double lon, lat;
-};
-
-struct distance {
-	int length; bool gnss, airspeed;
-};
-
-enum source {
-	inertial,
-	airspeed_tas,
-	airspeed_ias
-};
-
-struct movement {
-	bool gnss;
-	int vertical_rate, diff;
-	long double velocity, heading;
-	source info;
-};
 
 class Decoder {
 	private:

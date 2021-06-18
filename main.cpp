@@ -5,23 +5,25 @@
 #include <iomanip>
 #include <thread>
 #include <mutex>
-#include <unordered_map>
+#include <map>
 #include <thread>
 
 #include <unistd.h>
 
-#include <hasher/extension.cpp>
+typedef unsigned char byte;
 
+#include <hasher/extension.cpp>
 #include <backend/adsb.cpp>
 
 #include <window/graphics.cpp>
 #include <SFML/Graphics.hpp>
 
-
 using namespace std;
 
 std::mutex plane_access;
-std::unordered_map< std::vector<unsigned char>, plane, container_hash<std::vector<unsigned char>> > planes;
+std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > planes;
+
+sf::ContextSettings s { .antialiasingLevel = 5 };
 
 void packets() {
   Socket sock(2008);
@@ -31,9 +33,8 @@ void packets() {
 
 int main(int argc, char *argv[]){
   cerr << setprecision(20);
-  sf::ContextSettings s { .antialiasingLevel = 5 };
 
-  std::thread net_handler(packets);
+  std::thread(packets).detach();
 
   /*while(true) {
     plane_access.lock();
@@ -53,6 +54,27 @@ int main(int argc, char *argv[]){
     sleep(3);
   }*/
 
+
+  windowParams plnparams {
+    .bar_width = 2,
+    .bar_offset = 20,
+    .bar_lenght = 10,
+    .hei = 400, .wid = 700,
+    .bg = sf::Color(0,0,0),
+    .muted = sf::Color(120,120,120),
+    .secondary = sf::Color(170,210,190),
+    .tert = sf::Color(170,250,140),
+    .quadr = sf::Color(170,250,255),
+    .selection = sf::Color::Red,
+    .s = s,
+    .alpha = 235,
+    .hstart = 51, .hend = 53,
+    .vstart = 2, .vend = 4,
+    .label_size = 11, .scale_width = 1,
+    .shift_factor = 25, .text_offset = 6,
+    .title = L"Atc board view"
+  };
+
   windowParams params {
     .bar_width = 2,
     .bar_offset = 20,
@@ -60,16 +82,21 @@ int main(int argc, char *argv[]){
     .hei = 400, .wid = 400,
     .bg = sf::Color(0,0,0),
     .muted = sf::Color(120,120,120),
+    .secondary = sf::Color(170,210,190),
+    .tert = sf::Color(170,250,140),
+    .quadr = sf::Color(170,250,255),
+    .selection = sf::Color::Red,
     .s = s,
     .alpha = 235,
-    .hstart = 49, .hend = 51,
-    .vstart = 19, .vend = 21,
+    .hstart = 51, .hend = 53,
+    .vstart = 2, .vend = 4,
     .label_size = 11, .scale_width = 1,
     .shift_factor = 25, .text_offset = 6,
     .title = L"Atc radar view"
   };
 
-  radarWindow radar(params, plane_access, planes);
+  //while(true) {}
+  radarWindow radar(params, plnparams, plane_access, planes);
 
   radar.fillBuffers();
 
