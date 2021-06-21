@@ -8,13 +8,14 @@
 #include <window/hardware.cpp>
 #include <window/params.cpp>
 
-constexpr int l_size = 8;
+constexpr int l_size = 9;
 
 class radarWindow {
   private:
     sf::RenderWindow window;
     sf::RenderWindow planeWindow;
     windowParams params;
+    windowParams pparams;
     sf::Event event;
     sf::Font ft;
 
@@ -262,6 +263,17 @@ class radarWindow {
       return ret;
     }
 
+    sf::Text create_label(std::string txt, sf::Color color, int x, int y, size_t fsize){
+      sf::Text ret;
+      ret.setFont(ft);
+      ret.setString(txt);
+      ret.setPosition(x,y);
+      ret.setFillColor(color);
+      ret.setCharacterSize(fsize);
+
+      return ret;
+    }
+
     std::pair<int,int> translateCoords(long double v, long double h) {
       //std::cerr << params.bar_offset + params.shift_factor*params.scale_width << " + "  << (long double)(v - params.vstart) << " / " << std::fabs(params.vend - params.vstart) << " * " << (window.getSize().x - 2*params.bar_offset - 2*params.shift_factor*params.scale_width) << '\n';
       return std::make_pair(
@@ -278,9 +290,13 @@ class radarWindow {
       this->guides.push_back(create_label(text, c, x, y));
     }
 
+    void drawCategory(std::string text, int x){
+      addLabel(text, pparams.secondary, x, pparams.bar_offset);
+    }
+
   public:
 
-    radarWindow(windowParams g, windowParams pln, std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store) : window(sf::VideoMode(g.wid, g.hei), g.title, sf::Style::Default, g.s), planeWindow(sf::VideoMode(pln.wid, pln.hei), pln.title, sf::Style::Default, pln.s), params(g), access(access), store(store) {
+    radarWindow(windowParams g, windowParams pln, std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store) : window(sf::VideoMode(g.wid, g.hei), g.title, sf::Style::Default, g.s), planeWindow(sf::VideoMode(pln.wid, pln.hei), pln.title, sf::Style::Default, pln.s), params(g), access(access), store(store), pparams(pln) {
       setTransparency(window.getSystemHandle(), g.alpha);
       window.setFramerateLimit(g.frames);
       planeWindow.setFramerateLimit(pln.frames);
@@ -325,16 +341,19 @@ class radarWindow {
 
         size_t row = params.bar_offset;
 
-        addLabel("ICAO", params.secondary, params.bar_offset, row);
-        addLabel("CALL", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 1, row);
-        addLabel("IDENT", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 2, row);
-        addLabel("ALTI", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 3, row);
-        addLabel("SPD", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 4, row);
-        addLabel("AZIM", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 5, row);
-        addLabel("V/R", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 6, row);
-        addLabel("VSRC", params.secondary, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 7, row);
+        drawCategory("ICAO", pparams.bar_offset);
+        drawCategory("CALL", pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 1);
+        drawCategory("IDENT", pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 2);
+        drawCategory("ALTI", pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 3);
+        drawCategory("SPD", pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 4);
+        drawCategory("AZIM", pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 5);
+        drawCategory("V/R", pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 6);
+        drawCategory("VSRC", pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 7);
+        drawCategory("TTPK", pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 8);
 
         row += guides[0].getCharacterSize();
+
+        std::optional<std::chrono::time_point<std::chrono::system_clock>> latest_pkg;
 
         access.lock();
         for(auto &plane : store){
@@ -367,26 +386,51 @@ class radarWindow {
 
           auto data = plane.second;
 
-          addLabel(icc.str(), data.selected ? params.selection : params.muted, params.bar_offset, row);
-          addLabel(data.callsign ? *data.callsign : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 1, row);
-          addLabel(data.ident ? (std::to_string((*data.ident).first) + " " + std::to_string((*data.ident).second)) : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 2, row);
-          addLabel(data.altitude ? (std::to_string((*data.altitude).length) + "m") : "INOP", data.altitude ? ((*data.altitude).gnss ? params.tert : params.quadr) : params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 3, row);
+          addLabel(icc.str(), data.selected ? pparams.selection : pparams.muted, pparams.bar_offset, row);
+          addLabel(data.callsign ? *data.callsign : "INOP", pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 1, row);
+          addLabel(data.ident ? (std::to_string((*data.ident).first) + " " + std::to_string((*data.ident).second)) : "INOP", pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 2, row);
+          addLabel(data.altitude ? (std::to_string((*data.altitude).length) + "m") : "INOP", data.altitude ? ((*data.altitude).gnss ? pparams.tert : pparams.quadr) : pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 3, row);
           icc = std::stringstream();
           icc << std::fixed << std::setprecision(2) << (data.velocity ? (*data.velocity).velocity : 0);
-          addLabel(data.velocity ? (icc.str() + "kt") : "INOP", data.velocity ? ((*data.velocity).gnss ? params.tert : params.quadr) : params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 4, row);
+          addLabel(data.velocity ? (icc.str() + "kt") : "INOP", data.velocity ? ((*data.velocity).gnss ? pparams.tert : pparams.quadr) : pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 4, row);
           icc = std::stringstream();
           icc << std::fixed << std::setprecision(2) << (data.velocity ? (*data.velocity).heading : 0);
-          addLabel(data.velocity ? icc.str() : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 5, row);
-          addLabel(data.velocity ? (std::to_string((*data.velocity).vertical_rate) + "ft/min") : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 6, row);
-          addLabel(data.velocity ? ((*data.velocity).info == inertial ? "INERT" : ((*data.velocity).info == airspeed_ias ? "IAS" : "TAS")) : "INOP", params.tert, params.bar_offset + ((planeWindow.getSize().x - 2*params.bar_offset) / l_size) * 7, row);
+          addLabel(data.velocity ? icc.str() : "INOP", pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 5, row);
+          addLabel(data.velocity ? (std::to_string((*data.velocity).vertical_rate) + "ft/min") : "INOP", pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 6, row);
+          addLabel(data.velocity ? ((*data.velocity).info == inertial ? "INERT" : ((*data.velocity).info == airspeed_ias ? "IAS" : "TAS")) : "INOP", pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 7, row);
+          addLabel(std::to_string(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - data.last_pkg).count()), pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 8, row);
 
           row += guides[0].getCharacterSize();
+
+          if(!latest_pkg)
+            latest_pkg = data.last_pkg;
+          else
+            latest_pkg = std::max(*latest_pkg, data.last_pkg);
         }
         access.unlock();
 
         for(auto &t : this->guides)
           planeWindow.draw(t);
 
+        window.draw(create_label(latest_pkg ?
+          std::to_string(
+            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - *latest_pkg).count()
+          )
+          :
+          "PKGN"
+        , latest_pkg ? params.secondary : params.tert, window.getSize().x - (3*params.bar_offset), 3*params.bar_offset));
+
+        sf::Text north = create_label("N", params.secondary, (3*params.bar_offset), 3*params.bar_offset, 14);
+        window.draw(north);
+
+        sf::ConvexShape arrow;
+        arrow.setPointCount(3);
+        arrow.setPoint(0, sf::Vector2f(north.getGlobalBounds().left, north.getGlobalBounds().top));
+        arrow.setPoint(1, sf::Vector2f(north.getGlobalBounds().left + north.getGlobalBounds().width, north.getGlobalBounds().top));
+        arrow.setPoint(2, sf::Vector2f(north.getGlobalBounds().left + (north.getGlobalBounds().width)/2, north.getGlobalBounds().top - 10));
+        arrow.setFillColor(params.secondary);
+
+        window.draw(arrow);
 
         window.display();
         planeWindow.display();

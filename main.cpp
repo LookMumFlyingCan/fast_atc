@@ -36,25 +36,6 @@ int main(int argc, char *argv[]){
 
   std::thread(packets).detach();
 
-  /*while(true) {
-    plane_access.lock();
-    for(auto &i : planes){
-      std::cerr << "plane: " << std::hex << (int)i.first[0] << (int)i.first[1] << (int)i.first[2] << '\n';
-      std::cerr << std::dec;
-      std::cerr << " |-callsign: " << (i.second.callsign ? *i.second.callsign : "N/A") << '\n';
-      std::cerr << " |-squawk: " << (i.second.squawk ? *i.second.squawk : -1) << '\n';
-      std::cerr << " |-velocity: " << (i.second.velocity ? (*i.second.velocity).velocity : -1) << '\n';
-      std::cerr << " |-heading: " << (i.second.velocity ? (*i.second.velocity).heading : -1) << '\n';
-      std::cerr << " |-vertical: " << (i.second.velocity ? (*i.second.velocity).vertical_rate : -1) << '\n';
-      std::cerr << " |-lon: " << (i.second.position ? (*i.second.position).lon : -1) << '\n';
-      std::cerr << " |-lat: " << (i.second.position ? (*i.second.position).lat : -1) << '\n';
-      std::cerr << " |-ident: " << (i.second.ident ? (*i.second.ident).first : -1) << " " << (i.second.ident ? (*i.second.ident).second : -1) << '\n';
-    }
-    plane_access.unlock();
-    sleep(3);
-  }*/
-
-
   windowParams plnparams {
     .bar_width = 2,
     .bar_offset = 20,
@@ -95,7 +76,6 @@ int main(int argc, char *argv[]){
     .title = L"Atc radar view"
   };
 
-  //while(true) {}
   radarWindow radar(params, plnparams, plane_access, planes);
 
   radar.fillBuffers();

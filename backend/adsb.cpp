@@ -105,8 +105,7 @@ class Socket {
 				store.erase(*Decoder::icao(buf));
 				access.unlock();
 
-				//if(surv)
-				//	plane.selected = true;
+				plane.last_pkg = system_clock::now();
 
 				if(Decoder::altitude(buf))
 					plane.altitude = Decoder::altitude(buf);
