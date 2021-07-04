@@ -1,3 +1,5 @@
+#pragma once
+
 struct windowParams {
   size_t bar_width, bar_offset, bar_lenght, hei, wid, frames;
   sf::Color bg;

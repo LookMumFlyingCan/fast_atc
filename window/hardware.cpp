@@ -1,3 +1,7 @@
+#pragma once
+
+#include <SFML/Graphics.hpp>
+
 #if defined (SFML_SYSTEM_WINDOWS)
     #include <windows.h>
 

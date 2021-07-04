@@ -5,8 +5,6 @@
 #include <string>
 #include <sstream>
 
-#include <window/hardware.cpp>
-#include <window/params.cpp>
 
 #include "window/window.h"
 

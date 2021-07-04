@@ -1,4 +1,15 @@
+#pragma once
+
 #include <SFML/Graphics.hpp>
+
+#include "window/params.h"
+#include <mutex>
+
+#include "backend/plane.h"
+#include "backend/telemetry.h"
+
+#include "hasher/extension.h"
+
 
 constexpr int l_size = 9;
 
@@ -19,7 +30,7 @@ class radarWindow {
     std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store;
 
     std::mutex &sat_access;
-    telemetry &status;
+    sat_status &status;
 
     void drawBg(){
       window.clear(params.bg);
@@ -62,8 +73,12 @@ class radarWindow {
       addLabel(text, pparams.secondary, x, pparams.bar_offset);
     }
 
+    sf::Text create_temp(float, int, int);
+    sf::Text create_volt(float, int, int, int, int);
+    sf::Text create_amp(float, int, int, int, int);
+
   public:
-    radarWindow(windowParams g, windowParams pln, std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store, std::mutex &sat_access, telemetry &status);
+    radarWindow(windowParams g, windowParams pln, std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store, std::mutex &sat_access, sat_status &status);
 
     void addTriangle(size_t x, size_t y, sf::Color c = sf::Color::Blue){
       bounding_box.push_back( sf::Vertex(
@@ -81,4 +96,4 @@ class radarWindow {
     void loop();
 
     ~radarWindow();
-}
+};

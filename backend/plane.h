@@ -1,3 +1,10 @@
+#pragma once
+
+#include "backend/properties.h"
+#include "hasher/extension.h"
+
+typedef unsigned char byte;
+
 struct plane {
   bool selected;
   std::optional<std::pair<byte, byte>> ident;

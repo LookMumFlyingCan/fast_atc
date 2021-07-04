@@ -3,8 +3,6 @@
 #include <cmath>
 #include <algorithm>
 
-#include <backend/properties.cpp>
-
 #define BUFFER_SIZE 128
 
 const byte generator[4] = {0b11111111, 0b11111010, 0b00000100, 0b10000000};

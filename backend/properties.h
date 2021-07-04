@@ -1,3 +1,5 @@
+#pragma once
+
 struct coordinates {
 	long double lon, lat;
 };

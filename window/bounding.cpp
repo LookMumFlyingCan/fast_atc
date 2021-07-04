@@ -1,3 +1,6 @@
+#include <iostream>
+#include "window/window.h"
+
 void radarWindow::produceBoundingBox(size_t width, size_t box_lenght, size_t box_offset) {
   for(int i = 1; i*box_lenght < (this->window.getSize().x - 2*box_offset); i++){
     if(!(i & 1))

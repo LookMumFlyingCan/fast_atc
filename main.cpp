@@ -12,10 +12,12 @@
 
 typedef unsigned char byte;
 
-#include <hasher/extension.cpp>
+#include "backend/plane.h"
+
 #include <backend/socket.cpp>
 
 #include "window/window.h"
+#include "window/params.h"
 #include <SFML/Graphics.hpp>
 
 using namespace std;
@@ -24,7 +26,7 @@ std::mutex plane_access;
 std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > planes;
 
 std::mutex sat_access;
-telemetry status;
+sat_status status;
 
 sf::ContextSettings s { .antialiasingLevel = 5 };
 
@@ -71,7 +73,7 @@ int main(int argc, char *argv[]){
     .quadr = sf::Color(170,250,255),
     .selection = sf::Color::Red,
     .s = s,
-    .alpha = 235,
+    .alpha = 205,
     .hstart = 51, .hend = 53,
     .vstart = 2, .vend = 4,
     .label_size = 11, .scale_width = 1,

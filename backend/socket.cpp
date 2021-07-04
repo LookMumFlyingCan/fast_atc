@@ -2,6 +2,7 @@
 #include <cstring>
 #include <string>
 #include <chrono>
+#include <iomanip>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -9,9 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <backend/decoder.cpp>
-#include <backend/telemetry.cpp>
-
-#include <backend/plane.cpp>
+#include "backend/telemetry.h"
 
 #define BUFFER_SIZE 128
 
@@ -65,7 +64,7 @@ class Socket {
 		    std::cerr << "socket init done\n";
 		}
 
-		void loop(std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store, std::mutex &sat_access, telemetry &status) {
+		void loop(std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store, std::mutex &sat_access, sat_status &status) {
 			bool ok = false;
 			std::vector<byte> img;
 			do {
@@ -81,8 +80,17 @@ class Socket {
 				std::vector<byte> buf(BUFFER_SIZE);
 				int bytes = recv(conn, buf.data(), BUFFER_SIZE, 0);
 
+				std::cout << std::hex;
+
 				if(buf[0] == '*') {
+					buf.erase(buf.begin());
+
 					buf.resize(14);
+
+					for(int i = 0; i < 14; i++){
+						std::cout << (int)buf[i] << ' ';
+					}
+					std::cout << '\n';
 
 					bool surv = true;
 
@@ -137,6 +145,16 @@ class Socket {
 					access.lock();
 					store[*Decoder::icao(buf)] = plane;
 					access.unlock();
+				} else if (buf[0] == 'B'){
+					auto newt = reinterpret_cast<telemetry*>(&buf[0]);
+					sat_access.lock();
+					status.tel = *newt;
+					sat_access.unlock();
+				} else if (buf[0] == 'G') {
+					auto newg = reinterpret_cast<gps*>(&buf[0]);
+					sat_access.lock();
+					status.pos = *newg;
+					sat_access.unlock();
 				}
 
 			} while(true);

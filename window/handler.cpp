@@ -3,9 +3,6 @@
 #include <cmath>
 #include <string>
 
-#include <window/hardware.cpp>
-#include <window/params.cpp>
-
 #include "window/window.h"
 
 void radarWindow::handleKeypres(sf::Keyboard::Key key){
