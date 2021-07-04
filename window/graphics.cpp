@@ -8,6 +8,8 @@
 #include <window/hardware.cpp>
 #include <window/params.cpp>
 
+#include "window/window.h"
+
 constexpr int l_size = 9;
 
 class radarWindow {
@@ -25,6 +27,9 @@ class radarWindow {
 
     std::mutex &access;
     std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store;
+
+    std::mutex &sat_access;
+    telemetry &status;
 
     void drawBg(){
       window.clear(params.bg);
@@ -296,7 +301,7 @@ class radarWindow {
 
   public:
 
-    radarWindow(windowParams g, windowParams pln, std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store) : window(sf::VideoMode(g.wid, g.hei), g.title, sf::Style::Default, g.s), planeWindow(sf::VideoMode(pln.wid, pln.hei), pln.title, sf::Style::Default, pln.s), params(g), access(access), store(store), pparams(pln) {
+    radarWindow(windowParams g, windowParams pln, std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store, std::mutex &sat_access, telemetry &status) : window(sf::VideoMode(g.wid, g.hei), g.title, sf::Style::Default, g.s), planeWindow(sf::VideoMode(pln.wid, pln.hei), pln.title, sf::Style::Default, pln.s), params(g), access(access), store(store), pparams(pln) {
       setTransparency(window.getSystemHandle(), g.alpha);
       window.setFramerateLimit(g.frames);
       planeWindow.setFramerateLimit(pln.frames);

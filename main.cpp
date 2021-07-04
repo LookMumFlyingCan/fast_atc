@@ -13,9 +13,9 @@
 typedef unsigned char byte;
 
 #include <hasher/extension.cpp>
-#include <backend/adsb.cpp>
+#include <backend/socket.cpp>
 
-#include <window/graphics.cpp>
+#include "window/window.h"
 #include <SFML/Graphics.hpp>
 
 using namespace std;
@@ -23,12 +23,15 @@ using namespace std;
 std::mutex plane_access;
 std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > planes;
 
+std::mutex sat_access;
+telemetry status;
+
 sf::ContextSettings s { .antialiasingLevel = 5 };
 
 void packets() {
   Socket sock(2008);
 
-  sock.loop(plane_access, planes);
+  sock.loop(plane_access, planes, sat_access, status);
 }
 
 int main(int argc, char *argv[]){
@@ -76,7 +79,7 @@ int main(int argc, char *argv[]){
     .title = L"Atc radar view"
   };
 
-  radarWindow radar(params, plnparams, plane_access, planes);
+  radarWindow radar(params, plnparams, plane_access, planes, sat_access, status);
 
   radar.fillBuffers();
 

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <backend/decoder.cpp>
+#include <backend/telemetry.cpp>
 
 #include <backend/plane.cpp>
 
@@ -64,7 +65,7 @@ class Socket {
 		    std::cerr << "socket init done\n";
 		}
 
-		void loop(std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store) {
+		void loop(std::mutex &access, std::map< std::vector<unsigned char>, plane, container_comp<std::vector<unsigned char>> > &store, std::mutex &sat_access, telemetry &status) {
 			bool ok = false;
 			std::vector<byte> img;
 			do {
@@ -80,61 +81,63 @@ class Socket {
 				std::vector<byte> buf(BUFFER_SIZE);
 				int bytes = recv(conn, buf.data(), BUFFER_SIZE, 0);
 
-				buf.resize(14);
+				if(buf[0] == '*') {
+					buf.resize(14);
 
-				bool surv = true;
+					bool surv = true;
 
-				for(int i = 13; i >= 7; i--)
-					if(buf[i] != 0)
-						surv = false;
+					for(int i = 13; i >= 7; i--)
+						if(buf[i] != 0)
+							surv = false;
 
-				if(surv)
-					buf.resize(7);
+					if(surv)
+						buf.resize(7);
 
-				if(!Decoder::icao(buf))
-					continue;
+					if(!Decoder::icao(buf))
+						continue;
 
-				surv = false;
+					surv = false;
 
-				access.lock();
-				if(store.size() == 0)
-					surv = true;
+					access.lock();
+					if(store.size() == 0)
+						surv = true;
 
-				auto plane = store[*Decoder::icao(buf)];
+					auto plane = store[*Decoder::icao(buf)];
 
-				store.erase(*Decoder::icao(buf));
-				access.unlock();
+					store.erase(*Decoder::icao(buf));
+					access.unlock();
 
-				plane.last_pkg = system_clock::now();
+					plane.last_pkg = system_clock::now();
 
-				if(Decoder::altitude(buf))
-					plane.altitude = Decoder::altitude(buf);
+					if(Decoder::altitude(buf))
+						plane.altitude = Decoder::altitude(buf);
 
-				if(Decoder::identification(buf))
-					plane.ident = Decoder::identification(buf);
+					if(Decoder::identification(buf))
+						plane.ident = Decoder::identification(buf);
 
-				if(Decoder::callsign(buf))
-					plane.callsign = Decoder::callsign(buf);
+					if(Decoder::callsign(buf))
+						plane.callsign = Decoder::callsign(buf);
 
-				if(Decoder::displacement(buf))
-					plane.velocity = Decoder::displacement(buf);
+					if(Decoder::displacement(buf))
+						plane.velocity = Decoder::displacement(buf);
 
-				if(Decoder::squawk(buf))
-					plane.squawk = Decoder::squawk(buf);
+					if(Decoder::squawk(buf))
+						plane.squawk = Decoder::squawk(buf);
 
-				if(Decoder::parity(buf) && (*Decoder::parity(buf))){
-					plane.last_even = make_pair(buf, duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
-				} else if(Decoder::parity(buf) && !(*Decoder::parity(buf))) {
-					plane.last_odd = make_pair(buf, duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
-				}
+					if(Decoder::parity(buf) && (*Decoder::parity(buf))){
+						plane.last_even = make_pair(buf, duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
+					} else if(Decoder::parity(buf) && !(*Decoder::parity(buf))) {
+						plane.last_odd = make_pair(buf, duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
+					}
 
-				if(plane.last_odd && plane.last_even)
-					plane.position = Decoder::position((*plane.last_odd).first, (*plane.last_even).first, (*plane.last_odd).second,  (*plane.last_even).second);
+					if(plane.last_odd && plane.last_even)
+						plane.position = Decoder::position((*plane.last_odd).first, (*plane.last_even).first, (*plane.last_odd).second,  (*plane.last_even).second);
 
 
 					access.lock();
 					store[*Decoder::icao(buf)] = plane;
 					access.unlock();
+				}
 
 			} while(true);
 		}
