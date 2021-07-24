@@ -53,10 +53,10 @@ int main(int argc, char *argv[]){
     .quadr = sf::Color(170,250,255),
     .selection = sf::Color::Red,
     .s = s,
-    .alpha = 235,
+    .alpha = 255,
     .hstart = 51, .hend = 53,
     .vstart = 2, .vend = 4,
-    .label_size = 11, .scale_width = 1,
+    .label_size = 14, .scale_width = 1,
     .shift_factor = 25, .text_offset = 6,
     .title = L"Atc board view"
   };
@@ -73,10 +73,10 @@ int main(int argc, char *argv[]){
     .quadr = sf::Color(170,250,255),
     .selection = sf::Color::Red,
     .s = s,
-    .alpha = 205,
+    .alpha = 255,
     .hstart = 51, .hend = 53,
     .vstart = 2, .vend = 4,
-    .label_size = 11, .scale_width = 1,
+    .label_size = 14, .scale_width = 1,
     .shift_factor = 25, .text_offset = 6,
     .title = L"Atc radar view"
   };

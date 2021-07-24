@@ -42,6 +42,8 @@ void radarWindow::loop() {
 
     std::optional<std::chrono::time_point<std::chrono::system_clock>> latest_pkg;
 
+	std::vector<std::vector<unsigned char>> to_del;
+
     access.lock();
     for(auto &plane : store){
       if(plane.second.position){
@@ -68,19 +70,6 @@ void radarWindow::loop() {
         window.draw(circ);
       }
 
-      sat_access.lock();
-      auto coords = translateCoords(status.pos.longitude, status.pos.latitude);
-      sat_access.unlock();
-
-      sf::CircleShape circ;
-
-      circ.setOrigin(2.f, 2.f);
-      circ.setPosition(coords.first, coords.second);
-      circ.setFillColor(params.tert);
-      circ.setRadius(4.f);
-
-      window.draw(circ);
-
       std::stringstream icc;
       icc << std::hex << (int)plane.first[0] << (int)plane.first[1] << (int)plane.first[2];
 
@@ -89,7 +78,7 @@ void radarWindow::loop() {
       addLabel(icc.str(), data.selected ? pparams.selection : pparams.muted, pparams.bar_offset, row);
       addLabel(data.callsign ? *data.callsign : "INOP", pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 1, row);
       addLabel(data.ident ? (std::to_string((*data.ident).first) + " " + std::to_string((*data.ident).second)) : "INOP", pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 2, row);
-      addLabel(data.altitude ? (std::to_string((*data.altitude).length) + "m") : "INOP", data.altitude ? ((*data.altitude).gnss ? pparams.tert : pparams.quadr) : pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 3, row);
+      addLabel(data.altitude ? (std::to_string((*data.altitude).length) + "ft") : "INOP", data.altitude ? ((*data.altitude).gnss ? pparams.tert : pparams.quadr) : pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 3, row);
       icc = std::stringstream();
       icc << std::fixed << std::setprecision(2) << (data.velocity ? (*data.velocity).velocity : 0);
       addLabel(data.velocity ? (icc.str() + "kt") : "INOP", data.velocity ? ((*data.velocity).gnss ? pparams.tert : pparams.quadr) : pparams.tert, pparams.bar_offset + ((planeWindow.getSize().x - 2*pparams.bar_offset) / l_size) * 4, row);
@@ -106,11 +95,33 @@ void radarWindow::loop() {
         latest_pkg = data.last_pkg;
       else
         latest_pkg = std::max(*latest_pkg, data.last_pkg);
+
+	  if(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - data.last_pkg).count() > 50){
+		  to_del.push_back(plane.first);
+	  }
     }
     access.unlock();
 
+	for(auto &x : to_del)
+		store.erase(x);
+
+    sat_access.lock();
+    auto coords = translateCoords(status.pos.longitude, status.pos.latitude);
+    sat_access.unlock();
+
+    sf::CircleShape circ;
+
+    circ.setOrigin(2.f, 2.f);
+    circ.setPosition(coords.first, coords.second);
+    circ.setFillColor(params.tert);
+    circ.setRadius(4.f);
+
+    window.draw(circ);
+
     for(auto &t : this->guides)
       planeWindow.draw(t);
+
+
 
     window.draw(create_label(latest_pkg ?
       std::to_string(
@@ -119,6 +130,8 @@ void radarWindow::loop() {
       :
       "PKGN"
     , latest_pkg ? params.secondary : params.tert, window.getSize().x - (3*params.bar_offset), 3*params.bar_offset));
+    
+
 
     sf::Text north = create_label("N", params.secondary, (3*params.bar_offset), 3*params.bar_offset, 14);
     window.draw(north);

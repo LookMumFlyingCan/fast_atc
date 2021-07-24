@@ -96,6 +96,24 @@ class Decoder {
 				std::optional<std::pair<byte, byte>>(std::make_pair(data[4] >> 3, data[4] % (1 << 4))) : std::optional<std::pair<byte, byte>>(std::nullopt);
 		}
 
+		static std::optional<bool> bsgs(std::vector<byte> &data){
+			auto df = Decoder::downlinkFormat(data);
+			auto tc = Decoder::typecode(data);
+
+			if(df != 17)
+				return std::nullopt;
+
+			if(!tc)
+				return std::nullopt;
+
+			if(*tc >= 9 && *tc <= 18)
+				return true;
+			else if(*tc >= 20 && *tc <= 22)
+				return false;
+			else
+				return std::nullopt;
+		}
+
 		static std::optional<bool> parity(std::vector<byte> &data){
 			auto df = Decoder::downlinkFormat(data);
 			auto tc = Decoder::typecode(data);
@@ -104,6 +122,7 @@ class Decoder {
 				return std::nullopt;
 
 			return data[7] & (1 << 2);
+			return data[6] & (1 << 2);
 		}
 
 		static std::optional<std::string> callsign(std::vector<byte> &data){
@@ -136,11 +155,11 @@ class Decoder {
 				std::swap(timeF, timeS);
 			}
 
-			long double even_lat = (((first[6] % 4) * (1 << 15)) + (first[7] * (1 << 7)) + (first[8] >> 1)) / (long double)(1L << 17);
-			long double even_lon = (((first[8] % 2) * (1 << 16)) + (first[9] * (1 << 8)) + first[10]) / (long double)(1L << 17);
+			long double odd_lat = (((first[6] % 4) * (1 << 15)) + (first[7] * (1 << 7)) + (first[8] >> 1)) / (long double)(1L << 17);
+			long double odd_lon = (((first[8] % 2) * (1 << 16)) + (first[9] * (1 << 8)) + first[10]) / (long double)(1L << 17);
 
-			long double odd_lat = (((second[6] % 4) * (1 << 15)) + (second[7] * (1 << 7)) + (second[8] >> 1)) / (long double)(1L << 17);
-			long double odd_lon = (((second[8] % 2) * (1 << 16)) + (second[9] * (1 << 8)) + second[10]) / (long double)(1L << 17);
+			long double even_lat = (((second[6] % 4) * (1 << 15)) + (second[7] * (1 << 7)) + (second[8] >> 1)) / (long double)(1L << 17);
+			long double even_lon = (((second[8] % 2) * (1 << 16)) + (second[9] * (1 << 8)) + second[10]) / (long double)(1L << 17);
 
 			long double j = std::floor(59 * even_lat - 60 * odd_lat + 0.5);
 

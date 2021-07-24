@@ -26,6 +26,14 @@ void radarWindow::handleKeypres(sf::Keyboard::Key key){
       params.vstart++;
       params.vend++;
       break;
+    case sf::Keyboard::Key::C:
+      access.lock();
+      store.clear();
+      access.unlock();
+      sat_access.lock();
+      status = sat_status();
+      sat_access.unlock();
+      break;
     case sf::Keyboard::Key::Add:
       params.vend++;
       break;
